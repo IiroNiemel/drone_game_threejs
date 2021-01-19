@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Drone simulator</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			html, body {
+				width: 100%;
+				height: 100%;
+			}
+
+			body {
+				background-color: #ffffff;
+				margin: 0;
+				overflow: hidden;
+				font-family: arial;
+			}
+
+			#blocker {
+
+				position: absolute;
+
+				width: 100%;
+				height: 100%;
+
+				background-color: rgba(0,0,0,0.5);
+
+			}
+
+			#instructions {
+
+				width: 100%;
+				height: 100%;
+
+				display: -webkit-box;
+				display: -moz-box;
+				display: box;
+
+				-webkit-box-orient: horizontal;
+				-moz-box-orient: horizontal;
+				box-orient: horizontal;
+
+				-webkit-box-pack: center;
+				-moz-box-pack: center;
+				box-pack: center;
+
+				-webkit-box-align: center;
+				-moz-box-align: center;
+				box-align: center;
+
+				color: #ffffff;
+				text-align: center;
+
+				cursor: pointer;
+
+			}
+
+			#ui {
+				position: absolute;
+				width: 10%;
+				height: 10%;
+				padding: 10px;
+
+			}
+
+		</style>
+	</head>
+	<body>
+		<script src="three.js"></script>
+		<script src="https://threejs.org/examples/js/controls/PointerLockControls.js"></script>
+
+		<div id="blocker">
+
+			<div id="instructions">
+				<span style="font-size:40px">Click to play</span>
+				<br />
+				(W, A, S, D = Move, SPACE = Jump, MOUSE = Look around)
+			</div>
+
+		</div>
+
+		<div id="ui">
+			<p>
+				START THE GAME 
+			</p>
+
+		</div>
+
+		<script>
+
+			var camera, scene, renderer, controls;
+
+			var objects = [];
+
+			var raycaster;
+
+			var moveForward = false;
+			var moveBackward = false;
+			var moveLeft = false;
+			var moveRight = false;
+			var canJump = false;
+
+			var prevTime = performance.now();
+			var velocity = new THREE.Vector3();
+			var direction = new THREE.Vector3();
+			var vertex = new THREE.Vector3();
+			var color = new THREE.Color();
+			var rotaatioZ = 0
+			var acceleration = 0
+
+
+			//player
+			const baseboxWidth = 5;
+			const baseboxHeight = 2;
+			const baseboxDepth = 5;
+			const basegeometry = new THREE.BoxGeometry(baseboxWidth, baseboxHeight, baseboxDepth);
+			const basematerial = new THREE.MeshBasicMaterial({color: 0x008800});  // greenish blue
+			const Player = new THREE.Mesh(basegeometry, basematerial);
+			var initscore = 0;
+
+
+			const coneradius = 3;  
+			const coneheight = 6;  
+			const coneradialSegments = 16;  
+			const openEnded = true;  
+			const thetaStart = Math.PI * 0.25;  
+			const thetaLength = Math.PI * 1.5;  
+			const heightSegments = 3
+			const conegeometry = new THREE.ConeBufferGeometry(
+				coneradius, coneheight, coneradialSegments, heightSegments, openEnded, thetaStart, thetaLength);
+			const conematerial = new THREE.MeshBasicMaterial({color: 0x00DB00});  // greenish blue
+
+
+			class gameStuff{
+					constructor(_score){
+						this._score = _score;
+					}
+					InitTime(){
+						var _time = performance.now();
+					}
+					addScore(x){
+						this._score = this._score + x;
+					}
+					printScore(){
+						console.log(this._score)
+						return this._score
+					}
+					start(){
+						controls.disconnect();
+						console.log("Start!");
+						camera.position.y = 0;
+						camera.position.x = 0;
+						camera.position.z = 0;
+					}
+					viewScore(){
+						document.getElementById( 'ui' ).innerHTML = this._score;
+					}
+					gameTimer(){
+						console.log("aasdassd")
+					}
+
+				}
+
+
+			var meshBasicMaterial = new THREE.MeshBasicMaterial({
+					color: 0x0095DD,
+					wireframe: true,
+					wireframeLinewidth: 2
+				});
+
+				var circleGeo = new THREE.CircleGeometry(10, 20)
+
+				//var circle = new THREE.Mesh(circleGeo, meshBasicMaterial)
+				var circlearray = []
+				for (i = 0; i < 6; i++) {
+					circlearray[i] = new THREE.Mesh(circleGeo, meshBasicMaterial)
+					circlearray[i].position.z = -50 * i * 3.14
+				}
+
+
+
+
+			init();
+			animate();
+
+			function init() {
+
+				camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 1000 );
+
+				scene = new THREE.Scene();
+				//scene.background = new THREE.Color( 0xffffff );
+				//scene.fog = new THREE.Fog( 0xffffff, 0, 750 );
+
+				var light = new THREE.HemisphereLight( 0xeeeeff, 0x777788, 0.75 );
+				light.position.set( 0.5, 1, 0.75 );
+
+				scene.add( light );
+
+
+				//skybox
+				const loader = new THREE.TextureLoader();
+				const texture = loader.load(
+					'https://threejsfundamentals.org/threejs/resources/images/equirectangularmaps/tears_of_steel_bridge_2k.jpg',
+					() => {
+						const rt = new THREE.WebGLCubeRenderTarget(texture.image.height);
+						rt.fromEquirectangularTexture(renderer, texture);
+						scene.background = rt;
+				});
+			
+
+
+
+				controls = new THREE.PointerLockControls( camera, document.body );
+
+				var blocker = document.getElementById( 'blocker' );
+				var instructions = document.getElementById( 'instructions' );
+
+				instructions.addEventListener( 'click', function () {
+
+					controls.lock();
+
+				}, false );
+
+				controls.addEventListener( 'lock', function () {
+
+					instructions.style.display = 'none';
+					blocker.style.display = 'none';
+
+				} );
+
+				controls.addEventListener( 'unlock', function () {
+
+					blocker.style.display = 'block';
+					instructions.style.display = '';
+
+				} );
+
+
+				scene.add( controls.getObject() );
+
+				var onKeyDown = function ( event ) {
+
+					switch ( event.keyCode ) {
+
+						case 38: // up
+						case 87: // w
+							moveForward = true;
+							break;
+
+						case 37: // left
+						case 65: // a
+							moveLeft = true;
+							break;
+
+						case 40: // down
+						case 83: // s
+							moveBackward = true;
+							break;
+
+						case 39: // right
+						case 68: // d
+							moveRight = true;
+							break;
+
+						case 66:
+							game.printScore()
+							break;
+
+
+
+					}
+
+				};
+
+				var onKeyUp = function ( event ) {
+
+					switch ( event.keyCode ) {
+
+						case 38: // up
+						case 87: // w
+							moveForward = false;
+							break;
+
+
+							// 88 x
+							// 89 t
+							// 66 b
+
+							// 69 E
+
+						case 69: 
+							break;
+
+						case 37: // left
+						case 65: // a
+							moveLeft = false;
+							break;
+
+						case 40: // down
+						case 83: // s
+							moveBackward = false;
+							break;
+
+						case 39: // right
+						case 68: // d
+							moveRight = false;
+							break;
+							
+						case 68:
+							break;
+
+
+					}
+
+				};
+
+				document.addEventListener( 'keydown', onKeyDown, false );
+				document.addEventListener( 'keyup', onKeyUp, false );
+
+				//raycaster = new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3( 0, - 1, 0 ), 0, 10 );
+
+				// objects
+				
+				scene.add(Player);
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				document.body.appendChild( renderer.domElement );
+
+
+
+				// define ui
+
+
+				for (i = 0; i < circlearray.length; i++) {
+					scene.add(circlearray[i])
+				}
+
+				//colliders
+/* 				PlayerCollider = new THREE.Box3().setFromObject(Player);
+				
+				var CircleCollider = []
+				var Colliders = []
+
+				for (i = 0; i < circlearray.length; i++) {
+				CircleCollider[i] = new THREE.Box3().setFromObject(circlearray[i]);
+				Colliders[i] = PlayerCollider.intersectsBox(CircleCollider[i]);
+				} */
+
+
+
+				
+				//setTimeout(myFunction, 3000)
+
+				window.addEventListener( 'resize', onWindowResize, false );
+
+				//
+
+			}
+
+			function onWindowResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+			var game = new gameStuff(initscore);
+			var	asd = setInterval(myTimer, 1000);
+					function myTimer() {
+						game.addScore(-1)
+					}
+
+
+			function animate(  ) {
+
+				requestAnimationFrame( animate );
+				if ( controls.isLocked === true ) {
+
+				
+					Player.position.y = camera.position.y - 5;
+					Player.position.x = camera.position.x;
+					Player.position.z = camera.position.z - 14;
+
+					PlayerCollider = new THREE.Box3().setFromObject(Player);
+				
+					var CircleCollider = []
+					var Colliders = []
+
+					for (i = 0; i < circlearray.length; i++) {
+					CircleCollider[i] = new THREE.Box3().setFromObject(circlearray[i]);
+					Colliders[i] = PlayerCollider.intersectsBox(CircleCollider[i]);
+					}
+
+					for (i = 0; i < circlearray.length; i++) {
+						if (Colliders[i]) {
+							game.addScore(1)
+							scene.remove(circlearray[i])
+						}	
+					}
+
+					// update score view 
+					game.viewScore()
+
+					var time = performance.now();
+					var delta = ( time - prevTime ) / 1000;
+
+					
+					velocity.x -= velocity.x * 10.0 * delta;
+					velocity.z -= velocity.z * 10.0 * delta;
+
+					direction.z = Number( moveForward ) - Number( moveBackward );
+					direction.x = Number( moveLeft ) - Number( moveRight );
+					direction.normalize(); // this ensures consistent movements in all directions
+
+					if (direction.x != 0) {
+						if (direction.x > 0) {
+							Player.rotation.z = 1; 
+						}
+						else if(direction.x < 0) {
+							Player.rotation.z = -1;
+						}
+					} else {
+						Player.rotation.z = 0;
+					}
+
+					if (direction.z != 0) {
+						if (direction.z > 0) {
+							Player.rotation.x = -1; 
+						}
+						else if(direction.z < 0) {
+							Player.rotation.x = 1;
+						}
+					} else {
+						Player.rotation.x = 0;
+					}
+
+
+					if ( moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
+					if ( moveLeft || moveRight ) velocity.x -= direction.x * 400.0 * delta;
+					//if ( moveForward || moveBackward ) velocity.z -= direction.z * 400.0 * delta;
+					//if ( moveLeft || moveRight ) velocity.x -= direction.x * 400.0 * delta;
+
+/* 					if ( onObject === true ) {
+
+						velocity.y = Math.max( 10, velocity.y );
+						canJump = true;
+
+					}
+ */
+
+					//var directionZ = getDirectionZ();
+
+					//controls.getObject().translateX( velocity.x * delta );
+					controls.getObject().translateX( velocity.x * delta );
+					controls.getObject().translateY( velocity.y * delta );
+					controls.getObject().translateZ( velocity.z * delta );
+
+
+/* 					if ( controls.getObject().position.y < 10 ) {
+
+						velocity.y = 0;
+						controls.getObject().position.y = 10;
+
+					} */
+
+					prevTime = time;
+
+				}
+
+				renderer.render( scene, camera );
+
+			}
+
+		</script>
+	</body>
+</html>
