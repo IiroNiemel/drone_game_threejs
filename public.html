@@ -50,7 +50,7 @@
 				box-align: center;
 
 				color: #ffffff;
-				text-align: center;
+				/* text-align: center; */
 
 				cursor: pointer;
 
@@ -58,24 +58,54 @@
 
 			#ui {
 				position: absolute;
+				left: 5%;
+				top: 5%;
 				width: 10%;
 				height: 10%;
+				padding: 30px;
+				font-size: 40px;
+			}			
+			
+			#win {
+				position: absolute;
+				left: 40%;
+  				top: 150px;
+				width: 200px;
+				height: 230px;
 				padding: 10px;
+				background-color:#ffffff;
 
+			}
+
+			#scoreview {
+				padding: 10px;
+				background-color:#0fffff;
 			}
 
 		</style>
 	</head>
 	<body>
-		<script src="three.js"></script>
+		<script src="https://threejs.org/build/three.min.js"></script>
 		<script src="https://threejs.org/examples/js/controls/PointerLockControls.js"></script>
 
 		<div id="blocker">
 
 			<div id="instructions">
-				<span style="font-size:40px">Click to play</span>
-				<br />
-				(W, A, S, D = Move, SPACE = Jump, MOUSE = Look around)
+				<pre style="font-size:40px">
+			TRY TO FLY THROUGH CIRCLES ASAP
+		
+			W = FORWARD
+			A = LEFT
+			D = RIGHT
+			S = BACKWARD
+
+			HOW TO:
+			press E to reset currenct game
+			press ESC to have mouse
+			score reduces by 1 per sec
+
+			CLICK TO PLAY
+				</pre>
 			</div>
 
 		</div>
@@ -85,6 +115,13 @@
 				START THE GAME 
 			</p>
 
+		</div>
+
+		<div id="win">
+			<h2>END IS REACHED</h2>
+			<p>Please press ESC to have mouse</p>
+			<div id="scoreview"></div>>
+			<button onClick="game.gameReset()">RESTART</button>
 		</div>
 
 		<script>
@@ -132,6 +169,52 @@
 			const conematerial = new THREE.MeshBasicMaterial({color: 0x00DB00});  // greenish blue
 
 
+
+			function getRndInteger(min, max){
+				return Math.floor(Math.random() * (max - min)) + min;
+			}
+
+			var pointMaterial = new THREE.MeshBasicMaterial({
+					color: 0x0095DD,
+					wireframe: true,
+					wireframeLinewidth: 2
+				});
+
+			var circleGeo = new THREE.CircleGeometry(10, 20)
+			
+			var goalMaterial = new THREE.MeshBasicMaterial({
+				color: 0xff0000,
+				wireframe: true,
+				wireframeLinewidth: 10
+			});	
+			
+			var goal = new THREE.Mesh(circleGeo, goalMaterial)
+
+			var circlearray = []
+
+			//create array of circles
+
+			function createCircleArray() {
+				for (i = 0; i < difficulty; i++) {
+					if (i != difficulty-1 ){
+						circlearray[i] = new THREE.Mesh(circleGeo, pointMaterial)
+						circlearray[i].position.z = -100 * i
+						circlearray[i].position.x = getRndInteger(-70,70)
+						circlearray[i].name = "point"
+					}
+					else {
+						circlearray[i] = new THREE.Mesh(circleGeo, goalMaterial)
+						circlearray[i].position.z = -100 * i
+						console.log("Goal inited to zx location ", circlearray[i].position.z ,circlearray[i].position.x)
+						circlearray[i].name = "goal"
+					}
+				}
+			}
+
+			var difficulty = 6;
+
+			// game engine definition
+
 			class gameStuff{
 					constructor(_score){
 						this._score = _score;
@@ -159,38 +242,37 @@
 					gameTimer(){
 						console.log("aasdassd")
 					}
+					gameEnd(){
+						console.log("WIN with score of ", this._score);
+						document.getElementById( 'win' ).style.display = "block";
+						document.getElementById( "scoreview" ).innerHTML = this._score;
+						document.getElementById( 'ui' ).style.display = "none"; 
+					}
+					gameReset(){  // PRESSING E COMMITS RESET = back to position 0,0,0 , show ui, hide win view, score to 0
+						console.log("Reset!");
+						camera.position.y = 0;
+						camera.position.x = 0;
+						camera.position.z = 0;
+						document.getElementById( 'win' ).style.display = "none"; 
+						document.getElementById( 'scoreview' ).style.display = "inherit"; 
+						document.getElementById( 'ui' ).style.display = "block"; 
+						createCircleArray();
+						this._score = this._score * 0;
+					}
 
 				}
-
-
-			var meshBasicMaterial = new THREE.MeshBasicMaterial({
-					color: 0x0095DD,
-					wireframe: true,
-					wireframeLinewidth: 2
-				});
-
-				var circleGeo = new THREE.CircleGeometry(10, 20)
-
-				//var circle = new THREE.Mesh(circleGeo, meshBasicMaterial)
-				var circlearray = []
-				for (i = 0; i < 6; i++) {
-					circlearray[i] = new THREE.Mesh(circleGeo, meshBasicMaterial)
-					circlearray[i].position.z = -50 * i * 3.14
-				}
-
-
-
-
+	
 			init();
 			animate();
 
 			function init() {
+				document.getElementById( 'win' ).style.display = "none"; 
+				document.getElementById( 'scoreview' ).style.display = "inherit"; 
+				createCircleArray();
 
 				camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 1000 );
 
 				scene = new THREE.Scene();
-				//scene.background = new THREE.Color( 0xffffff );
-				//scene.fog = new THREE.Fog( 0xffffff, 0, 750 );
 
 				var light = new THREE.HemisphereLight( 0xeeeeff, 0x777788, 0.75 );
 				light.position.set( 0.5, 1, 0.75 );
@@ -210,11 +292,11 @@
 			
 
 
-
 				controls = new THREE.PointerLockControls( camera, document.body );
 
 				var blocker = document.getElementById( 'blocker' );
 				var instructions = document.getElementById( 'instructions' );
+
 
 				instructions.addEventListener( 'click', function () {
 
@@ -226,6 +308,7 @@
 
 					instructions.style.display = 'none';
 					blocker.style.display = 'none';
+					controls.disconnect();
 
 				} );
 
@@ -267,8 +350,6 @@
 							game.printScore()
 							break;
 
-
-
 					}
 
 				};
@@ -282,14 +363,8 @@
 							moveForward = false;
 							break;
 
-
-							// 88 x
-							// 89 t
-							// 66 b
-
-							// 69 E
-
-						case 69: 
+						case 69:  // E reset button
+							game.gameReset();
 							break;
 
 						case 37: // left
@@ -318,8 +393,6 @@
 				document.addEventListener( 'keydown', onKeyDown, false );
 				document.addEventListener( 'keyup', onKeyUp, false );
 
-				//raycaster = new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3( 0, - 1, 0 ), 0, 10 );
-
 				// objects
 				
 				scene.add(Player);
@@ -330,33 +403,11 @@
 				document.body.appendChild( renderer.domElement );
 
 
-
-				// define ui
-
-
 				for (i = 0; i < circlearray.length; i++) {
 					scene.add(circlearray[i])
 				}
 
-				//colliders
-/* 				PlayerCollider = new THREE.Box3().setFromObject(Player);
-				
-				var CircleCollider = []
-				var Colliders = []
-
-				for (i = 0; i < circlearray.length; i++) {
-				CircleCollider[i] = new THREE.Box3().setFromObject(circlearray[i]);
-				Colliders[i] = PlayerCollider.intersectsBox(CircleCollider[i]);
-				} */
-
-
-
-				
-				//setTimeout(myFunction, 3000)
-
 				window.addEventListener( 'resize', onWindowResize, false );
-
-				//
 
 			}
 
@@ -368,12 +419,14 @@
 				renderer.setSize( window.innerWidth, window.innerHeight );
 
 			}
+
 			var game = new gameStuff(initscore);
 			var	asd = setInterval(myTimer, 1000);
-					function myTimer() {
-						game.addScore(-1)
-					}
 
+			
+			function myTimer() {
+				game.addScore(-1)
+			}
 
 			function animate(  ) {
 
@@ -397,12 +450,19 @@
 
 					for (i = 0; i < circlearray.length; i++) {
 						if (Colliders[i]) {
-							game.addScore(1)
-							scene.remove(circlearray[i])
-						}	
+							if (circlearray[i].name != "goal"){
+								game.addScore(1);
+								scene.remove(circlearray[i]); 
+								delete Colliders[i];
+							}
+							else {
+								game.gameEnd()
+							}
+						}
+
 					}
 
-					// update score view 
+					// update score to ui 
 					game.viewScore()
 
 					var time = performance.now();
@@ -416,6 +476,8 @@
 					direction.x = Number( moveLeft ) - Number( moveRight );
 					direction.normalize(); // this ensures consistent movements in all directions
 
+
+					// rotation of flying obj according to direction
 					if (direction.x != 0) {
 						if (direction.x > 0) {
 							Player.rotation.z = 1; 
@@ -441,31 +503,10 @@
 
 					if ( moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
 					if ( moveLeft || moveRight ) velocity.x -= direction.x * 400.0 * delta;
-					//if ( moveForward || moveBackward ) velocity.z -= direction.z * 400.0 * delta;
-					//if ( moveLeft || moveRight ) velocity.x -= direction.x * 400.0 * delta;
 
-/* 					if ( onObject === true ) {
-
-						velocity.y = Math.max( 10, velocity.y );
-						canJump = true;
-
-					}
- */
-
-					//var directionZ = getDirectionZ();
-
-					//controls.getObject().translateX( velocity.x * delta );
 					controls.getObject().translateX( velocity.x * delta );
 					controls.getObject().translateY( velocity.y * delta );
 					controls.getObject().translateZ( velocity.z * delta );
-
-
-/* 					if ( controls.getObject().position.y < 10 ) {
-
-						velocity.y = 0;
-						controls.getObject().position.y = 10;
-
-					} */
 
 					prevTime = time;
 
